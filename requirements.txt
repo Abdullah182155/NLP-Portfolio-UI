@@ -1,0 +1,8 @@
+streamlit 
+numpy 
+pandas 
+plotly
+yfinance 
+sklearn
+xgboost
+scikit-learn==1.4.2
