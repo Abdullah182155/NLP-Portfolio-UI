@@ -3,6 +3,5 @@ numpy
 pandas 
 plotly
 yfinance 
-sklearn
 xgboost
 scikit-learn
