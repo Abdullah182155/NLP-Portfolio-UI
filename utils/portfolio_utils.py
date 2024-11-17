@@ -169,7 +169,7 @@ def window_weight(window_num, start_date, end_date, total_cash, strategy, rollin
     stock_symbols = []
     weights = {}
     portfolio_results = {}  # To store portfolio results in memory
-    print(rolling_windows_data.items())
+    #print(rolling_windows_data.items())
     # Extract stock symbols from rolling_windows_data
     for stock_symbol, data in rolling_windows_data.items():
         if f'{stock_symbol}_window_{window_num}' in data:
