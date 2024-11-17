@@ -1,9 +1,7 @@
 # Calculate positive news weights
 import os
 import pandas as pd
-import streamlit as st
-from datetime import datetime, timedelta
-import numpy as np
+
 def calculate_positive_news_weights(folder_path, stock_symbols, start_date, end_date):
     positive_news_counts = {}
 

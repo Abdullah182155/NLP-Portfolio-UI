@@ -2,7 +2,6 @@ import streamlit as st
 from datetime import datetime
 import pandas as pd
 import os
-import plotly.express as px
 import plotly.graph_objects as go
 from utils.model_utils import predict_with_model_in_memory
 from utils.data_utils import divide_results_and_save_to_memory
@@ -10,8 +9,6 @@ from utils.portfolio_utils import get_next_dates, window_weight
 
 def run_app():
     st.title("NLP Portfolio App")
-
-    data_dict = {}  # In-memory storage
 
     data_folder = st.text_input("Data Folder:", "Processed_Datasets/")
     model_folder = st.text_input("Model Folder:", "best_models/")
@@ -21,7 +18,11 @@ def run_app():
     strategies = st.multiselect("Select Strategies:", ['return_based', 'risk_adjusted', 'expected_return', 'positive_news'])
     initial_invested_cash = st.number_input("Total Cash:", min_value=0, value=100000)
     original_invested_cash = initial_invested_cash  # Store the original invested cash value
-    
+
+    # Sidebar inputs for threshold ratios
+    peak_threshold_ratio = st.sidebar.number_input("Peak Threshold Ratio:", min_value=0, value=5)
+    bottom_threshold_ratio = st.sidebar.number_input("Bottom Threshold Ratio:", min_value=-10, value=0)
+
     results = []
 
     if st.button("Run Predictions"):
@@ -59,7 +60,6 @@ def run_app():
               
                 total_cash = initial_invested_cash + total_model_return_cash
 
-
                 strategy_results.append({
                     "Window": i,
                     "Start Date": start_date_str,
@@ -69,43 +69,78 @@ def run_app():
                     "Model Return (%)": total_model_return,
                     "Accuracy (%)": accuracy,
                     "Invested Cash": total_cash,
-                    "Weights": weights
+                    "Weights": weights,
+                    "Filtered Returns": filtered_returns,
                 })
+                
                 initial_invested_cash = total_cash
                 current_start_date = datetime.strptime(end_date_str, '%Y-%m-%d') + pd.DateOffset(days=1)
 
             results_df = pd.DataFrame(strategy_results)
-            st.write(f"Portfolio Results by Window for Strategy: {strategy}")
             st.dataframe(results_df)
+            # Identify peaks and bottoms
+            results_df["Peaks"] = results_df["Model Return (%)"] > peak_threshold_ratio
+            results_df["Bottoms"] = results_df["Model Return (%)"] < bottom_threshold_ratio
 
-            # Check if weight data is available
-            weight_data = [
-                {"Window": result["Window"], "Company": company, "Weight": weight}
-                for result in strategy_results
-                if "Weights" in result and isinstance(result["Weights"], dict)
-                for company, weight in result["Weights"].items()
-            ]
+            # Display detailed table for each peak and bottom point
+            for point_type in ["Peaks", "Bottoms"]:
+                st.subheader(f"{point_type} Details for Strategy: {strategy}")
+                detailed_rows = []
+                
+                for index, row in results_df[results_df[point_type]].iterrows():
+                    if isinstance(row["Weights"], dict):
+                        for stock, weight in row["Weights"].items():
+                            detailed_rows.append({
+                                "Window": row["Window"],
+                                "Start Date": row["Start Date"],
+                                "End Date": row["End Date"],
+                                "Stock": stock,
+                                "Return (%)": row["Filtered Returns"].get(stock, None),
+                                "Weight": weight,
+                                "Model Return (%)": row["Model Return (%)"]
+                            })
+                
+                detailed_df = pd.DataFrame(detailed_rows)
+                if not detailed_df.empty:
+                    st.dataframe(detailed_df)
+                else:
+                    st.write(f"No {point_type.lower()} data available for this strategy.")
 
-            if not weight_data:
-                st.warning(f"No weight data available for strategy: {strategy}")
-                continue
+            # Create the plot for peaks and bottoms
+            fig_strategy = go.Figure()
 
-            weight_df = pd.DataFrame(weight_data)
+            # Line for model return
+            fig_strategy.add_trace(go.Scatter(
+                x=results_df["Start Date"], y=results_df["Model Return (%)"],
+                mode='lines+markers', name=f'{strategy} - Model Return (%)',
+                line=dict(color='blue')
+            ))
 
-            if weight_df.empty:
-                st.warning(f"Weight DataFrame is empty for strategy: {strategy}")
-                continue
+            # Mark peaks
+            fig_strategy.add_trace(go.Scatter(
+                x=results_df.loc[results_df["Peaks"], "Start Date"],
+                y=results_df.loc[results_df["Peaks"], "Model Return (%)"],
+                mode='markers', name='Peaks',
+                marker=dict(color='green', size=10, symbol='triangle-up')
+            ))
 
-            fig_weights_bar = px.bar(
-                weight_df,
-                x="Window",
-                y="Weight",
-                color="Company",
-                title=f"Weights of Each Company Across Windows for Strategy: {strategy}",
-                barmode='stack'
+            # Mark bottoms
+            fig_strategy.add_trace(go.Scatter(
+                x=results_df.loc[results_df["Bottoms"], "Start Date"],
+                y=results_df.loc[results_df["Bottoms"], "Model Return (%)"],
+                mode='markers', name='Bottoms',
+                marker=dict(color='red', size=10, symbol='triangle-down')
+            ))
+
+            # Update layout
+            fig_strategy.update_layout(
+                title=f'Model Return with Peaks and Bottoms for Strategy: {strategy}',
+                xaxis_title="Start Date", yaxis_title="Model Return (%)",
+                template="plotly_white"
             )
-            fig_weights_bar.update_layout(template="plotly_white")
-            st.plotly_chart(fig_weights_bar)
+
+            # Display plot
+            st.plotly_chart(fig_strategy)
 
             results_df["Start Date"] = pd.to_datetime(results_df["Start Date"])
             model_return_traces.append(go.Scatter(
@@ -141,4 +176,3 @@ def run_app():
             xaxis_title="Start Date", yaxis_title="Accuracy (%)", template="plotly_white"
         )
         st.plotly_chart(fig_accuracy)
-
