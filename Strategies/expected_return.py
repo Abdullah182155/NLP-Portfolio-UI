@@ -3,7 +3,7 @@ import pandas as pd
 
 # Define a function to calculate quarterly returns for a DataFrame
 def calculate_quarterly_returns(df, column_name='Close'):
-    df = df.resample('Q').ffill()  # Resample data to quarterly frequency
+    df = df.resample('QE').ffill()  # Resample data to quarterly frequency
     df['Quarterly_Return'] = df[column_name].pct_change() * 100  # Calculate quarterly returns
     df.dropna(subset=['Quarterly_Return'], inplace=True)  # Drop rows with NaN values
     return df
@@ -22,7 +22,7 @@ def calculate_expected_returns(prices_folder, stock_symbols, start_date, end_dat
 
     # Load and process treasury data for the risk-free rate
     treasury_data = pd.read_csv(treasury_file, parse_dates=['Date'], index_col='Date')
-    treasury_data = treasury_data.resample('Q').ffill()  # Resample to quarterly
+    treasury_data = treasury_data.resample('QE').ffill()  # Resample to quarterly
     treasury_data = treasury_data.loc[:end_date]
 
 
